@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>PUMP dB</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  /* ======== SPLASH ======== */
+  #splash { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center;
+    background: url('https://i.ibb.co/pvVGzw9b/Whats-App-Image-2025-08-16-at-4-02-43-PM.jpg') no-repeat center center fixed;
+    background-size: cover; transition: opacity .5s ease; }
+  #splash.hidden{ opacity:0; pointer-events:none; }
+  .splash-screen { text-align: center; color: #fff; background-color: rgba(0,0,0,0.6); padding: 40px; border-radius: 15px;
+    box-shadow: 0 4px 8px rgba(0,0,0,.3); animation: fadeIn 1s ease-in-out; }
+  .splash-screen h1 { font-size: 3.2em; margin: 0 0 10px; text-shadow: 2px 2px 4px rgba(0,0,0,.5); }
+  .splash-screen p { font-size: 1.4em; margin: 0 0 20px; }
+  .splash-screen button { padding: 12px 30px; font-size: 1.2em; background-color: #28a745; color:#fff; border:0; border-radius:8px; cursor:pointer; }
+  .splash-screen button:hover{ background-color:#218838; }
+  @keyframes fadeIn { from{opacity:0; transform:scale(.98)} to{opacity:1; transform:scale(1)} }
+
+  /* ======== APP ======== */
+  :root{ --bg:#121212; --card:#1e1e1e; --ink:#eaeaea; --muted:#b8b8b8; --cyan:#00e5ff; --good:#00e676; --bad:#ff1744; --accent:#77c589; --warn:#ffc107; }
+  body{background:var(--bg);color:var(--ink);font-family:'Segoe UI',system-ui,Arial,sans-serif;margin:0}
+  .page{max-width:1100px;margin:24px auto;padding:0 16px}
+  .title{font-size:24px;font-weight:700;color:var(--cyan);text-align:center;margin:0 0 18px;text-shadow:0 0 6px #00e5ff44}
+  .top-grid{display:grid;gap:20px;grid-template-columns: 1fr 1fr;align-items:start}
+  @media (max-width: 900px){ .top-grid{grid-template-columns: 1fr} }
+  .card{background:var(--card);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+  .card.pad{padding:18px 18px}
+  .panel h3{margin:0 0 14px;font-size:18px;color:#8be9fd}
+  .rows{display:flex;flex-direction:column;gap:12px}
+  .row{display:grid;gap:12px;align-items:center;grid-template-columns: 1.3fr 1fr auto}
+  .row.compact{grid-template-columns: 1.5fr auto 1fr}
+  label{font-weight:700}
+  .suffix{color:var(--muted)}
+  .input{background:#0f0f0f;border:1px solid #2e2e2e;border-radius:12px;color:var(--ink);padding:12px 10px;font-size:16px;width:100%;text-align:center}
+  .check{transform:scale(1.15)}
+  .actions{display:flex;gap:12px;align-items:center;margin-top:6px;flex-wrap:wrap}
+  .btn{background:var(--accent);border:none;color:#072a1f;font-weight:800;padding:10px 16px;border-radius:12px;cursor:pointer}
+  .btn.test{background:#00e5ff;color:#00303a}
+  .btn.ghost{background:#7b8b8f;color:#eaf6ff}
+  .msg{font-size:12px}.ok{color:#69f0ae}.err{color:#ff5252}
+  .info-block{margin-top:16px;padding:10px 12px;border-radius:12px;background:#151515;color:#cfd8dc;font-size:14px;display:grid;gap:4px}
+  .info-block strong{color:#e5f5ff}
+  .info-sub{font-size:13px;color:#9ee6ff;margin-left:18px}
+  .gauge-card{padding:16px}
+  #gaugeContainer{width:min(520px,100%);margin:6px auto 0;position:relative}
+  #gaugeCanvas{width:100%;height:auto;display:block;aspect-ratio:1/1}
+  .gauge-title{font-size:20px;font-weight:700;color:var(--cyan);text-align:center;margin:4px 0 8px}
+  #centerValue{ position:absolute;left:50%;top:62%;transform:translate(-50%,-50%);
+    font-size:36px;font-weight:900;color:#eaffff;text-shadow:0 0 10px #00e5ff77;padding:6px 12px;border-radius:12px }
+  .chart-card{margin-top:20px;padding:18px}
+  #chartContainer{width:100%;max-width:1000px;margin:0 auto}
+
+  /* ===== Toasts ===== */
+  .toast-container{ position:fixed; right:16px; top:16px; z-index:99999; display:flex; flex-direction:column; gap:10px; pointer-events:none; }
+  .toast{ min-width:260px; max-width:360px; padding:12px 14px; border-radius:12px; background:#222; color:#fff; box-shadow:0 12px 28px rgba(0,0,0,.4);
+    display:grid; grid-template-columns:auto 1fr auto; gap:10px; align-items:start; opacity:0; transform:translateY(-6px); animation:toast-in .2s ease forwards; pointer-events:auto; }
+  .toast .t-title{font-weight:800; margin:0 0 4px; font-size:14px}
+  .toast .t-msg{font-size:13px; color:#ddd}
+  .toast button{ background:transparent; border:0; color:#fff; font-weight:900; cursor:pointer; opacity:.9; }
+  .toast.info{border-left:4px solid var(--cyan)} .toast.ok{border-left:4px solid var(--good)} .toast.warn{border-left:4px solid var(--warn)} .toast.err{border-left:4px solid var(--bad)}
+  @keyframes toast-in{to{opacity:1; transform:translateY(0)}} @keyframes toast-out{to{opacity:0; transform:translateY(-6px)}}
+
+  /* ===== Botones tipo "píldora" ===== */
+  .pill{ display:inline-flex; align-items:center; gap:.5rem; background:#0f2026; color:#dff7ff; padding:.55rem .9rem; border-radius:12px; border:1px solid #27444d; }
+  .pill input{ transform:scale(1.1); }
+  .pill .icon{ font-size:1.05rem; }
+  body.lock-scroll{ overflow:hidden; }
+
+  /* 🔴 Halo / pulso */
+  #gaugeContainer.alert-pulse{ border-radius: 50%; animation: pulseGlow 0.9s ease-in-out infinite; }
+  @keyframes pulseGlow{ 0%{box-shadow:0 0 0 0 rgba(255,23,68,0)} 40%{box-shadow:0 0 28px 10px rgba(255,23,68,.55)} 60%{box-shadow:0 0 40px 14px rgba(255,23,68,.7)} 100%{box-shadow:0 0 0 0 rgba(255,23,68,0)} }
+  @media (prefers-reduced-motion: reduce){ #gaugeContainer.alert-pulse{ animation:none; box-shadow:0 0 40px 12px rgba(255,23,68,.65); } }
+  #centerValue.alert-pulse{ animation:textPulse 1s ease-in-out infinite; }
+  @keyframes textPulse{ 0%,100%{transform:translate(-50%,-50%) scale(1); color:#ffeaea} 50%{transform:translate(-50%,-50%) scale(1.18); color:#ff5c8d} }
+
+  /* ===== Wake Lock ===== */
+  #btnWakeLock { background:#0f2026; color:#dff7ff; border:1px solid #27444d; border-radius:12px; padding:.55rem .9rem; font-weight:700; }
+  #btnWakeLock:hover { background:#152f38; }
+
+  /* ===== Relay ===== */
+  #btnRelay.on{ background: var(--good); color:#003a1f }
+  #btnRelay.off{ background:#f00909; color:#fff6ea }
+  .relay-block{ position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); text-align:center; width: 100%; }
+  .relay-block .actions{ justify-content:center; margin:0 }
+  .relay-block .msg{ margin-top:2px }
+  .relay-block .info-sub{ margin-top:2px; margin-left:0 }
+</style>
+</head>
+<body class="lock-scroll">
+
+  <!-- ======= SPLASH ======= -->
+  <div id="splash" aria-label="Pantalla de bienvenida">
+    <div class="splash-screen">
+      <h1>BLADEN</h1>
+      <p>20</p>
+      <button id="enterBtn" type="button">Entrar</button>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toasts"></div>
+
+  <!-- ======= APP ======= -->
+  <div id="app" style="visibility:hidden;">
+    <div class="page">
+      <h1 class="title">Medidor de Decibelios</h1>
+
+      <div class="top-grid">
+        <!-- Panel -->
+        <div class="card pad panel">
+          <h3>Configracion de Alertas de nivel sonoro (dB) y WhatsApp</h3>
+          <div class="rows">
+            <div class="row"><label>🔉 Alerta BAJA &lt;</label><input id="alertLow" class="input" type="number" min="0" step="1"/><span class="suffix">dB</span></div>
+            <div class="row"><label>🔊 Alerta ALTA &gt;</label><input id="alertHigh" class="input" type="number" min="1" step="1"/><span class="suffix">dB</span></div>
+            <div class="row"><label>📈 Máx dB (escala gauge)</label><input id="maxDb" class="input" type="number" min="40" step="5"/><span class="suffix">dB</span></div>
+            <div class="row compact"><label>📏 Auto-escala gráfico</label><input id="autoScale" class="check" type="checkbox"/><span></span></div>
+            <div class="row compact"><label>✅ Activar WhatsApp</label><input id="waEnabled" class="check" type="checkbox"/><span></span></div>
+            <div class="row"><label>⏱️ Intervalo (min)</label><input id="intervalMin" class="input" type="number" min="1" step="1"/><span class="suffix">min</span></div>
+            <div class="row compact"><label>🌀 Enviar cada lectura fuera de rango</label><input id="everyOut" class="check" type="checkbox"/><span></span></div>
+
+            <div class="actions">
+              <button class="btn" id="btnSave">Guardar</button>
+              <button class="btn test" id="btnTestWA">Probar WhatsApp</button>
+              <span class="msg" id="saveMsg"></span>
+            </div>
+
+            <div class="actions">
+              <label class="pill" title="Seguir leyendo y guardando historial cuando la app esté en segundo plano">
+                <input id="bgFollow" type="checkbox"><span class="icon">🔄</span> Seguir segundo plano
+              </label>
+              <button class="btn ghost" id="btnWakeLock">🛡️ Mantener pantalla activa</button>
+            </div>
+          </div>
+
+          <div class="info-block">
+            <div>📊 <strong>Última lectura:</strong> <span id="lastReading">--</span></div>
+            <div>📨 <strong>Último WhatsApp:</strong> <span id="lastWhats">--</span>
+              <div id="lastWhatsMsg" class="info-sub">--</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Gauge -->
+        <div class="card gauge-card">
+          <div class="gauge-title">Nivel Sonoro (dB)</div>
+          <div id="gaugeContainer">
+            <canvas id="gaugeCanvas"></canvas>
+            <div id="centerValue">0</div>
+
+            <div class="relay-block">
+              <div class="actions">
+                <button id="btnRelay" class="btn ghost off" aria-pressed="false" type="button">🔌 PUMP: --</button>
+              </div>
+              <div class="msg" id="relayMsg"></div>
+              <div id="relayLastTime" class="info-sub">Último cambio: --</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gráfica -->
+      <div class="card chart-card">
+        <div id="chartContainer"><canvas id="chart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ====== CONTROL SPLASH ====== */
+(function(){
+  const splash = document.getElementById('splash');
+  const app = document.getElementById('app');
+  const btn = document.getElementById('enterBtn');
+  function showApp(){
+    try{
+      splash && splash.classList.add('hidden');
+      document.body.classList.remove('lock-scroll');
+      setTimeout(()=>{ if(app) app.style.visibility='visible'; }, 400);
+      requestNativeNotifPermission();
+    }catch(e){ console.error(e); }
+  }
+  if(btn) btn.addEventListener('click', showApp, { once:true });
+})();
+
+/* ===== Util ===== */
+function nowStr(){ try { return new Date().toLocaleString('es-MX', { hour12:true }); } catch { return new Date().toLocaleString(); } }
+const clamp = (v,min,max)=>Math.min(Math.max(v,min),max);
+
+/* ===== Toasts ===== */
+const TOAST_TTL = 3800;
+function toast(title, msg='', kind='info'){
+  const cont = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = `toast ${kind}`;
+  el.innerHTML = `<div style="font-size:18px;line-height:1">🔔</div><div><div class="t-title">${title}</div><div class="t-msg">${msg}</div></div><button aria-label="cerrar">✕</button>`;
+  const close = ()=>{ el.style.animation='toast-out .15s ease forwards'; setTimeout(()=>el.remove(), 150); };
+  el.querySelector('button').onclick = close;
+  cont.appendChild(el);
+  setTimeout(close, TOAST_TTL);
+}
+const toastUser = (icon, title, msg='', kind='ok') => toast(`${icon} ${title}`, msg, kind);
+
+/* ===== Notificaciones nativas ===== */
+function requestNativeNotifPermission(){ if('Notification' in window && Notification.permission==='default'){ Notification.requestPermission().catch(()=>{}); } }
+function notifyNative(title, body){
+  try{ if(document.visibilityState==='hidden' && 'Notification' in window && Notification.permission==='granted'){ new Notification(title, { body }); } }catch(e){}
+}
+
+/* ===== Config persistente ===== */
+const LS_KEY = 'alertasWhats_dB_V1';
+const defaults = { low:30, high:85, waEnabled:false, intervalMin:5, max:120, everyOut:false, autoScale:true, bgFollow:true, wakeWanted:false };
+
+const ui = {
+  low: alertLow, high: alertHigh, maxDb: maxDb, autoScale: autoScale, waEnabled: waEnabled,
+  intervalMin: intervalMin, everyOut: everyOut, btnSave: btnSave, btnTestWA: btnTestWA,
+  saveMsg: saveMsg, lastReading: lastReading, lastWhats: lastWhats, lastWhatsMsg: lastWhatsMsg,
+  bgFollow: document.getElementById('bgFollow'), btnWakeLock: document.getElementById('btnWakeLock')
+};
+function loadCfg(){ try{ return {...defaults, ...(JSON.parse(localStorage.getItem(LS_KEY))||{})}; }catch(e){ return {...defaults}; } }
+function saveCfg(c){ localStorage.setItem(LS_KEY, JSON.stringify(c)); }
+let cfg = loadCfg();
+ui.low.value = cfg.low; ui.high.value = cfg.high; ui.maxDb.value = cfg.max;
+ui.autoScale.checked = cfg.autoScale; ui.waEnabled.checked = cfg.waEnabled;
+ui.intervalMin.value = cfg.intervalMin; ui.everyOut.checked = cfg.everyOut;
+ui.bgFollow.checked = cfg.bgFollow;
+
+function setStatus(msg, ok=true){ ui.saveMsg.textContent = msg; ui.saveMsg.className = 'msg ' + (ok ? 'ok' : 'err'); }
+
+/* ===== Persistencia del ÚLTIMO WhatsApp ===== */
+const WA_KEY = "last_whatsapp_v1";
+function loadLastWhats(){
+  try{
+    const j = JSON.parse(localStorage.getItem(WA_KEY));
+    if(j){
+      lastWhats.textContent = j.time || "--";
+      lastWhatsMsg.textContent = j.msg || "--";
+    }
+  }catch(e){}
+}
+function saveLastWhats(time, msg){
+  try{
+    localStorage.setItem(WA_KEY, JSON.stringify({ time, msg }));
+  }catch(e){}
+  lastWhats.textContent = time;
+  lastWhatsMsg.textContent = msg;
+}
+// Cargar al iniciar
+loadLastWhats();
+
+/* ===== TOASTS en controles ===== */
+ui.autoScale.addEventListener('change', ()=>{ const on = ui.autoScale.checked; toastUser('📏','Auto-escala gráfico', on?'Activada':'Desactivada', on?'ok':'warn'); });
+ui.waEnabled.addEventListener('change', ()=>{ const on = ui.waEnabled.checked; toastUser('✅','Activar WhatsApp', on?'Activado':'Desactivado', on?'ok':'warn'); });
+ui.everyOut.addEventListener('change', ()=>{ const on = ui.everyOut.checked; toastUser('🌀','Enviar cada lectura fuera de rango', on?'Activado':'Desactivado', on?'ok':'warn'); });
+ui.bgFollow.addEventListener('change', ()=>{ cfg.bgFollow = ui.bgFollow.checked; saveCfg(cfg); applyBackgroundPolicy(); toastUser('🔄','Segundo plano', cfg.bgFollow?'Seguir segundo plano: ON':'OFF', cfg.bgFollow?'ok':'warn'); });
+
+ui.btnSave.onclick = ()=>{
+  const low = parseFloat(ui.low.value), high = parseFloat(ui.high.value);
+  const maxDb = Math.max(40, parseFloat(ui.maxDb.value || defaults.max));
+  const intervalMin = Math.max(1, parseInt(ui.intervalMin.value||'1',10));
+  const autoScale = ui.autoScale.checked;
+  if(!(low>=0 && high>low)){ setStatus('Revisa umbrales: BAJA < ALTA', false); toastUser('💾','Guardar','Revisa umbrales: BAJA < ALTA','warn'); return; }
+  if(high>maxDb){ setStatus('ALTA debe ser ≤ Máx dB', false); toastUser('💾','Guardar','ALTA debe ser ≤ Máx dB','warn'); return; }
+  cfg = { ...cfg, low, high, waEnabled: ui.waEnabled.checked, intervalMin, max: maxDb, everyOut: ui.everyOut.checked, autoScale };
+  saveCfg(cfg);
+  if(!cfg.autoScale){ chart.options.scales.y.min = 0; chart.options.scales.y.max = cfg.max; } else { applyYAxisAuto(); }
+  chart.update(); drawGauge(displayedValue);
+  setStatus('Guardado ✔', true);
+  toastUser('💾','Configuración','OK','ok');
+  setWorkerInterval(15000);
+};
+
+/* ===== Gauge ===== */
+const canvas = document.getElementById('gaugeCanvas');
+const ctx2d = canvas.getContext('2d');
+const centerValueEl = document.getElementById('centerValue');
+function fitCanvas(){ const r = canvas.getBoundingClientRect(), dpr = window.devicePixelRatio||1; canvas.width=r.width*dpr; canvas.height=r.height*dpr; ctx2d.setTransform(dpr,0,0,dpr,0,0); }
+const ro = new ResizeObserver(()=>{ fitCanvas(); drawGauge(displayedValue); }); ro.observe(canvas);
+const startAngle=135, totalAngle=270; let value=0, displayedValue=value;
+const colorGreen='#00e676', colorRed='#ff1744'; function d2r(d){ return (Math.PI/180)*d; }
+function zoneColor(v){ return (v<cfg.low||v>cfg.high) ? colorRed : colorGreen; }
+function niceStep(max){ if(max<=60) return 5; if(max<=120) return 10; if(max<=200) return 20; const raw=Math.ceil(max/12); return Math.ceil(raw/5)*5; }
+function drawGauge(val){
+  const w=canvas.clientWidth,h=canvas.clientHeight,cx=w/2,cy=h/2,r=Math.min(w,h)/2-24,MAX=cfg.max; ctx2d.clearRect(0,0,w,h);
+  [{s:0,e:cfg.low,c:colorRed},{s:cfg.low,e:cfg.high,c:colorGreen},{s:cfg.high,e:MAX,c:colorRed}].forEach(z=>{
+    const s=d2r(startAngle+(z.s/MAX)*totalAngle), e=d2r(startAngle+(z.e/MAX)*totalAngle);
+    ctx2d.beginPath(); ctx2d.lineWidth=Math.max(14,r*0.13); ctx2d.strokeStyle=z.c; ctx2d.arc(cx,cy,r,s,e); ctx2d.stroke();
+  });
+  ctx2d.lineWidth=2; ctx2d.font="12px Segoe UI"; ctx2d.fillStyle="#ccc";
+  for(let i=0;i<=MAX;i+=niceStep(MAX)){
+    const a=d2r(startAngle+(i/MAX)*totalAngle), x1=cx+Math.cos(a)*(r-8), y1=cy+Math.sin(a)*(r-8), x2=cx+Math.cos(a)*(r-24), y2=cy+Math.sin(a)*(r-24);
+    ctx2d.beginPath(); ctx2d.moveTo(x1,y1); ctx2d.lineTo(x2,y2); ctx2d.strokeStyle="#fff"; ctx2d.stroke();
+    const xt=cx+Math.cos(a)*(r-40), yt=cy+Math.sin(a)*(r-40); const wtxt=ctx2d.measureText(i.toString()).width; ctx2d.fillText(i.toString(), xt-wtxt/2, yt+4);
+  }
+  const clamped=clamp(val,0,MAX), a=d2r(startAngle+(clamped/MAX)*totalAngle), L=r-40;
+  ctx2d.beginPath(); ctx2d.moveTo(cx,cy); ctx2d.lineTo(cx+Math.cos(a)*L, cy+Math.sin(a)*L); ctx2d.strokeStyle="#ffbf00"; ctx2d.lineWidth=4; ctx2d.shadowColor="#ffbf00aa"; ctx2d.shadowBlur=8; ctx2d.stroke(); ctx2d.shadowBlur=0;
+  ctx2d.beginPath(); ctx2d.arc(cx,cy,16,0,2*Math.PI); ctx2d.fillStyle="#ffd740"; ctx2d.fill(); ctx2d.lineWidth=3; ctx2d.strokeStyle="#555"; ctx2d.stroke();
+  centerValueEl.textContent=clamp(displayedValue,0,MAX).toFixed(0);
+  centerValueEl.style.textShadow=`0 0 10px ${zoneColor(displayedValue)}88`;
+  const cont = document.getElementById('gaugeContainer');
+  if(displayedValue < cfg.low || displayedValue > cfg.high){
+    cont.classList.add('alert-pulse'); centerValueEl.classList.add('alert-pulse');
+  } else {
+    cont.classList.remove('alert-pulse'); centerValueEl.classList.remove('alert-pulse');
+  }
+}
+function animateNeedle(toVal,duration=350){
+  toVal=clamp(toVal,0,cfg.max); const from=displayedValue, start=performance.now();
+  const step=(t)=>{ const p=Math.min(1,(t-start)/duration), ease=p<0.5?2*p*p:-1+(4-2*p)*p; displayedValue=from+(toVal-from)*ease; drawGauge(displayedValue); if(p<1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+fitCanvas(); drawGauge(value);
+
+/* ===== WhatsApp ===== */
+const WA_PHONE = '+5212311560234', WA_APIKEY = '4036182';
+async function sendWhatsApp(text){
+  const url = "https://api.callmebot.com/whatsapp.php?phone="+encodeURIComponent(WA_PHONE)+"&text="+encodeURIComponent(text)+"&apikey="+encodeURIComponent(WA_APIKEY);
+  try{ const ac=new AbortController(); const t=setTimeout(()=>ac.abort(),8000); await fetch(url,{mode:'no-cors',signal:ac.signal}); clearTimeout(t); setStatus('WhatsApp enviado.', true); return true; }catch(e){}
+  try{ await new Promise((res,rej)=>{ const img=new Image(); img.onload=()=>res(); img.onerror=()=>rej(new Error('img err')); img.src=url+'&cb='+Date.now(); }); setStatus('WhatsApp enviado (img).',true); return true; }catch(e){ setStatus('No se pudo enviar WhatsApp.',false); return false; }
+}
+btnTestWA.onclick = async ()=>{
+  toastUser('📲','Probar WhatsApp','Enviando…','info');
+  if(!waEnabled.checked){ setStatus('Activa WhatsApp antes de probar.', false); toastUser('📲','Probar','Actívalo antes de probar.','warn'); return; }
+  const msg='🔧 Prueba de envío desde el dashboard.';
+  if(await sendWhatsApp(msg)){
+    saveLastWhats(nowStr(), msg); // <-- persistente
+    toastUser('📲','Prueba','Mensaje enviado.','ok');
+  } else {
+    toastUser('📲','Prueba','Falló.','err');
+  }
+};
+
+/* ===== Chart ===== */
+const chart = new Chart(document.getElementById('chart').getContext('2d'),{
+  type:'line',
+  data:{ labels:[], datasets:[{ label:'dB', data:[], borderColor:'#00bcd4', backgroundColor:'rgba(0,188,212,.2)', tension:.3, fill:true, pointRadius:3.5, pointBackgroundColor:'#00e5ff', pointHoverRadius:6 }]},
+  options:{ responsive:true, animation:false, interaction:{mode:'nearest',axis:'x',intersect:false},
+    onClick:(e,els)=>{ if(els.length){ const i=els[0].index; value=chart.data.datasets[0].data[i]; animateNeedle(value); maybeAlert(value); } },
+    layout:{padding:{left:4,right:10,top:8,bottom:6}},
+    scales:{ x:{ticks:{color:'#ccc'}}, y:{min:0,max:defaults.max,ticks:{color:'#ccc'}} },
+    plugins:{
+      legend:{labels:{color:'#ccc'}},
+      tooltip:{
+        backgroundColor:'#222',
+        titleColor:'#00e5ff',
+        bodyColor:'#fff',
+        titleFont:{weight:'bold'},
+        callbacks:{
+          // Título en dos líneas: Fecha y Hora (desde history[i].t)
+          title(items){
+            const i = items?.[0]?.dataIndex ?? 0;
+            const iso = history?.[i]?.t;
+            if(iso){
+              const d = new Date(iso);
+              const fecha = d.toLocaleDateString('es-MX',{year:'2-digit',month:'2-digit',day:'2-digit'});
+              const hora  = d.toLocaleTimeString('es-MX',{hour12:true});
+              return [`Fecha: ${fecha}`, `Hora: ${hora}`];
+            }
+            return items?.[0]?.label ?? '';
+          },
+          label(c){
+            const val = (typeof c.formattedValue==='string') ? c.formattedValue : (c.parsed?.y ?? c.raw);
+            return `Valor: ${val} dB`;
+          }
+        }
+      }
+    }
+  }
+});
+
+function applyYAxisAuto(){
+  const arr=chart.data.datasets[0].data;
+  if(!cfg.autoScale||arr.length===0){ chart.options.scales.y.min=0; chart.options.scales.y.max=cfg.max; return; }
+  let min=Math.min(...arr), max=Math.max(...arr); if(min===max){ min-=1; max+=1; }
+  const pad=Math.max((max-min)*0.1,2); min=Math.max(0, Math.floor(min-pad)); max=Math.min(cfg.max, Math.ceil(max+pad)); if(max<=min) max=min+2;
+  chart.options.scales.y.min=min; chart.options.scales.y.max=max;
+}
+
+/* ===== HISTORIAL PERSISTENTE ===== */
+const HISTORY_KEY="db_history_v1", HISTORY_MAX_POINTS=2000, BACKFILL_RESULTS=40;
+function loadHistory(){ try { return JSON.parse(localStorage.getItem(HISTORY_KEY))||[]; } catch { return []; } }
+function saveHistory(arr){ try { localStorage.setItem(HISTORY_KEY, JSON.stringify(arr.slice(-HISTORY_MAX_POINTS))); } catch(e){} }
+function mergeReadings(currentArr,newArr){ const seen=new Set(currentArr.map(p=>p.id??p.t)); for(const p of newArr){ const k=p.id??p.t; if(!seen.has(k)) currentArr.push(p); } currentArr.sort((a,b)=>new Date(a.t)-new Date(b.t)); return currentArr.slice(-HISTORY_MAX_POINTS); }
+
+function rebuildChartFrom(historyArr){
+  const labels=historyArr.map(p=>new Date(p.t).toLocaleTimeString('es-MX',{hour12:true}));
+  const data=historyArr.map(p=>p.v);
+  chart.data.labels=labels;
+  chart.data.datasets[0].data=data;
+  if(cfg.autoScale) applyYAxisAuto();
+  chart.update('none');
+  if(historyArr.length){
+    const last=historyArr[historyArr.length-1];
+    animateNeedle(last.v);
+    lastReading.textContent=new Date(last.t).toLocaleString('es-MX',{hour12:true});
+  }
+}
+function appendPointToChart(point){
+  chart.data.labels.push(new Date(point.t).toLocaleTimeString('es-MX',{hour12:true}));
+  chart.data.datasets[0].data.push(point.v);
+  if(chart.data.labels.length>HISTORY_MAX_POINTS){ chart.data.labels.shift(); chart.data.datasets[0].data.shift(); }
+  if(cfg.autoScale) applyYAxisAuto();
+  chart.update('none');
+}
+
+let history = loadHistory(); rebuildChartFrom(history);
+
+/* ===== Alertas ===== */
+let lastSent=0, lastState='normal';
+function maybeAlert(v){
+  const now=Date.now(), cooldown=(cfg.intervalMin||3)*60*1000;
+  let state=(v<cfg.low)?'low':(v>cfg.high)?'high':'normal';
+  const changed=(state!==lastState), out=(state!=='normal');
+  const shouldSend = cfg.waEnabled && out && ((cfg.everyOut && (now-lastSent)>=cooldown) || (!cfg.everyOut && changed && (now-lastSent)>=cooldown));
+  if(shouldSend){
+    const msg = (state==='low')?`⚠️ Nivel SONORO BAJO: ${v} dB (umbral < ${cfg.low} dB)`:`⚠️ Nivel SONORO ALTO: ${v} dB (umbral > ${cfg.high} dB)`;
+    sendWhatsApp(msg).then(ok=>{
+      if(ok){
+        lastSent=now;
+        saveLastWhats(nowStr(), msg); // <-- persistente
+        notifyNative('Alerta dB', msg);
+      }
+    });
+  }
+  lastState=state;
+}
+
+/* ===== ThingSpeak + Worker ===== */
+const CHANNEL_ID=3036715, READ_APIKEY="RT6C672EH8EJ9PEU", FIELD_NUM=1;
+const WRITE_APIKEY = "2S05JP4LGSWP65XV";
+let lastSeenEntryId=null, lastSeenISO=null;
+let pollIntervalMs=15000, worker=null, backfillTimer=null;
+function startWorker(){
+  try{
+    const code=`
+      let cfg={channel:${CHANNEL_ID}, key:${JSON.stringify(READ_APIKEY)}, field:${FIELD_NUM}, iv:${pollIntervalMs}};
+      let timer=null;
+      async function tick(){
+        try{
+          const url='https://api.thingspeak.com/channels/'+cfg.channel+'/fields/'+cfg.field+'/last.json?api_key='+cfg.key+'&_='+(Date.now());
+          const r=await fetch(url,{cache:'no-store'}); const j=await r.json(); postMessage({ok:true,data:j});
+        }catch(e){ postMessage({ok:false, err:(e&&e.message)?e.message:'error'}); }
+      }
+      function loop(){ clearInterval(timer); timer=setInterval(tick,cfg.iv); tick(); }
+      onmessage=(ev)=>{ const m=ev.data||{}; if(m.type==='config'&&m.iv){ cfg.iv=m.iv; loop(); } else if(m.type==='kick'){ tick(); } };
+      loop();
+    `;
+    const blob=new Blob([code],{type:'application/javascript'}); const url=URL.createObjectURL(blob);
+    worker=new Worker(url); worker.onmessage=onWorkerMsg;
+  }catch(e){ worker=null; setInterval(leerThingSpeakFallback,pollIntervalMs); leerThingSpeakFallback(); }
+}
+function stopWorker(){ if(worker){ worker.terminate(); worker=null; } }
+function setWorkerInterval(ms){ pollIntervalMs=Math.max(3000,Math.floor(ms)); if(worker){ worker.postMessage({type:'config', iv:pollIntervalMs}); } }
+function kickWorker(){ if(worker){ worker.postMessage({type:'kick'}); } else { leerThingSpeakFallback(); } }
+function onWorkerMsg(ev){ const m=ev.data||{}; if(!m.ok){ setStatus('Error al leer ThingSpeak.', false); return; } handleThingSpeakData(m.data,true); }
+async function leerThingSpeakFallback(){ try{ const url=`https://api.thingspeak.com/channels/${CHANNEL_ID}/fields/${FIELD_NUM}/last.json?api_key=${READ_APIKEY}&_=${Date.now()}`; const resp=await fetch(url,{cache:'no-store'}); handleThingSpeakData(await resp.json(),false); }catch(err){ setStatus('Error al leer ThingSpeak.', false); } }
+async function fetchRecentAndBackfill(){
+  try{
+    const url=new URL(`https://api.thingspeak.com/channels/${CHANNEL_ID}/fields/${FIELD_NUM}.json`);
+    url.searchParams.set('results', BACKFILL_RESULTS); url.searchParams.set('api_key', READ_APIKEY); url.searchParams.set('_', Date.now().toString());
+    const r=await fetch(url.toString(),{cache:'no-store'}); if(!r.ok) return; const j=await r.json();
+    const pts=(j.feeds||[]).map(f=>{ const raw=f[`field${FIELD_NUM}`]; const v=raw==null?null:Number(raw); if(v==null||Number.isNaN(v)) return null; return {id:f.entry_id, t:f.created_at, v}; }).filter(Boolean);
+    if(!pts.length) return;
+    history=mergeReadings(history, pts); saveHistory(history); rebuildChartFrom(history);
+    const last=pts[pts.length-1]; lastSeenEntryId=last.id??lastSeenEntryId; lastSeenISO=last.t??lastSeenISO;
+  }catch(e){}
+}
+function handleThingSpeakData(data){
+  if(!data){ setStatus('Sin datos de ThingSpeak.', false); return; }
+  const entryId=data.entry_id??null, createdAt=data.created_at??null, raw=data[`field${FIELD_NUM}`], valor=parseFloat(raw);
+  if(isNaN(valor)){ setStatus('Dato inválido o ausente en ThingSpeak.', false); return; }
+  if((lastSeenEntryId!==null && entryId!==null && entryId===lastSeenEntryId) || (lastSeenISO!==null && createdAt!==null && createdAt===lastSeenISO)) return;
+  if(entryId!==null) lastSeenEntryId=entryId; if(createdAt!==null) lastSeenISO=createdAt;
+  const v=clamp(valor,0,cfg.max); value=v; animateNeedle(v); maybeAlert(v);
+  const point={ id: entryId ?? `${createdAt ?? Date.now()}`, t: createdAt ?? new Date().toISOString(), v };
+  history=mergeReadings(history,[point]); saveHistory(history); appendPointToChart(point);
+  lastReading.textContent=new Date(point.t).toLocaleString('es-MX',{hour12:true});
+}
+
+/* ==== Política de segundo plano ==== */
+function startBackfillLoop(){ if(backfillTimer) clearInterval(backfillTimer); backfillTimer=setInterval(fetchRecentAndBackfill, 60000); }
+function stopBackfillLoop(){ if(backfillTimer) { clearInterval(backfillTimer); backfillTimer=null; } }
+function applyBackgroundPolicy(){
+  if(document.visibilityState==='visible'){
+    if(!worker) startWorker();
+    startBackfillLoop();
+    fetchRecentAndBackfill();
+    kickWorker();
+  } else {
+    if(cfg.bgFollow){ setWorkerInterval(15000); if(!backfillTimer) startBackfillLoop(); }
+    else { stopWorker(); stopBackfillLoop(); }
+  }
+}
+
+/* ===== Wake Lock ===== */
+let wakeLock=null;
+function updateWakeBtn(active){ ui.btnWakeLock.textContent = (active? '🛡️ Pantalla activa: ON' : '🛡️ Mantener pantalla activa'); }
+async function requestWakeLock(){
+  if(!('wakeLock' in navigator)){ toast('🛡️ Pantalla activa','No soportado en este navegador.','warn'); return; }
+  try{
+    wakeLock = await navigator.wakeLock.request('screen');
+    cfg.wakeWanted = true; saveCfg(cfg); updateWakeBtn(true);
+    wakeLock.addEventListener('release', ()=>{ updateWakeBtn(false); });
+    toast('🛡️ Pantalla activa','Wake Lock habilitado.','ok');
+  }catch(e){ toast('🛡️ Pantalla activa','No se pudo activar ('+(e.message||'error')+').','err'); }
+}
+async function releaseWakeLock(){ try{ if(wakeLock){ await wakeLock.release(); } wakeLock=null; cfg.wakeWanted=false; saveCfg(cfg); updateWakeBtn(false); toast('🛡️ Pantalla activa','Desactivado.','warn'); }catch(e){} }
+ui.btnWakeLock.addEventListener('click', ()=>{ if(wakeLock){ releaseWakeLock(); } else { requestWakeLock(); } });
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && cfg.wakeWanted && !wakeLock){ requestWakeLock(); } applyBackgroundPolicy(); });
+
+/* ===== Relay (field2) ON/OFF ===== */
+const RELAY_FIELD = 2;
+let relayState = null; // 0=OFF, 1=ON
+let relayCooldownUntil = 0;
+const TS_MIN_INTERVAL_MS = 16000;
+const MAX_RETRIES = 3;
+let relayPollTimer = null;
+const relayBtn = ()=>document.getElementById('btnRelay');
+const relayMsg = ()=>document.getElementById('relayMsg');
+const relayLastEl = ()=>document.getElementById('relayLastTime');
+
+function setRelayUI(state){
+  const btn = relayBtn(); if(!btn) return;
+  const on = state===1; btn.classList.toggle('on', on); btn.classList.toggle('off', !on);
+  btn.textContent = on ? '🔌 PUMP: ON' : '🔌 PUMP: OFF';
+  btn.setAttribute('aria-pressed', on? 'true':'false');
+}
+function setRelayStatus(text, ok=true){ const el=relayMsg(); if(!el) return; el.textContent=text; el.className = 'msg ' + (ok?'ok':'err'); }
+function setRelayLast(tsISO){
+  try{
+    const el = relayLastEl(); if(!el) return;
+    const d = tsISO ? new Date(tsISO) : new Date();
+    el.textContent = 'Último cambio: ' + d.toLocaleString('es-MX', { hour12:true });
+  }catch(e){}
+}
+
+async function readRelayState(){
+  try{
+    const url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/fields/${RELAY_FIELD}/last.json?api_key=${READ_APIKEY}&_=${Date.now()}`;
+    const r = await fetch(url,{cache:'no-store'}); const j = await r.json();
+    const raw = j[`field${RELAY_FIELD}`]; const v = Number(raw);
+    if(!Number.isNaN(v)){
+      const newState = v>0?1:0;
+      const changed = (relayState === null) || (newState !== relayState);
+      relayState = newState; setRelayUI(relayState);
+      if(changed){ setRelayLast(j.created_at || null); }
+    }
+  }catch(e){ /* silencio */ }
+}
+
+async function writeRelayState(v){
+  try{
+    const r = await fetch('https://api.thingspeak.com/update.json',{
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
+      body: new URLSearchParams({ api_key: WRITE_APIKEY, [`field${RELAY_FIELD}`]: String(v) })
+    });
+    const j = await r.json().catch(()=>null);
+    const entryId = (j && typeof j === 'object') ? j.entry_id : NaN;
+    const ok = !Number.isNaN(entryId) && entryId>0;
+    if(ok){ setRelayStatus(v? 'PUMP encendido':'PUMP apagado', true); setRelayLast(); }
+    else { setRelayStatus('No se pudo escribir (posible límite de 15s o clave inválida).', false); }
+    return ok;
+  }catch(e){ setRelayStatus('Error de red al escribir en ThingSpeak.', false); return false; }
+}
+
+async function getChannelLastInfo(){
+  try{
+    const url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds/last.json?_=${Date.now()}`;
+    const r = await fetch(url,{cache:'no-store'}); const j = await r.json();
+    const ts = j && j.created_at ? new Date(j.created_at).getTime() : null;
+    if(!ts) return null;
+    const diff = Date.now() - ts; const msUntilOpen = Math.max(0, TS_MIN_INTERVAL_MS - diff);
+    return { lastAt: ts, msUntilOpen };
+  }catch(e){ return null; }
+}
+
+let relayCountdownTimer = null;
+function startRelayCountdown(ms){
+  const btn = relayBtn(); if(!btn) return;
+  btn.disabled = true;
+  const base = (relayState===1) ? '🔌 PUMP: ON' : '🔌 PUMP: OFF';
+  const end = Date.now() + ms;
+  function tick(){
+    const left = Math.max(0, end - Date.now());
+    const s = Math.ceil(left/1000);
+    btn.textContent = `${base} (⏳ ${s}s)`;
+    if(left<=0){ stopRelayCountdown(); }
+  }
+  stopRelayCountdown();
+  relayCountdownTimer = setInterval(tick, 250);
+  tick();
+}
+function stopRelayCountdown(){
+  const btn = relayBtn(); if(btn){ btn.disabled = false; setRelayUI(relayState===1?1:0); }
+  if(relayCountdownTimer){ clearInterval(relayCountdownTimer); relayCountdownTimer=null; }
+}
+
+async function ensureChannelOpenWithCountdown(){
+  const info = await getChannelLastInfo();
+  if(info && info.msUntilOpen>0){
+    startRelayCountdown(info.msUntilOpen);
+    await new Promise(res=>setTimeout(res, info.msUntilOpen));
+    stopRelayCountdown();
+  }
+}
+
+async function doToggleWithRetries(next, tries){
+  await ensureChannelOpenWithCountdown();
+  setRelayStatus('Enviando…');
+  const ok = await writeRelayState(next);
+  if(ok) return true;
+  if(tries<=1){ setRelayStatus('No se pudo escribir después de reintentos.', false); return false; }
+  startRelayCountdown(3000);
+  await new Promise(res=>setTimeout(res,3000));
+  stopRelayCountdown();
+  return await doToggleWithRetries(next, tries-1);
+}
+
+async function toggleRelay(){
+  const now = Date.now();
+  if (now < relayCooldownUntil) {
+    const waitMs = relayCooldownUntil - now;
+    setRelayStatus('Espera un momento antes de otro cambio.', false);
+    startRelayCountdown(waitMs);
+    setTimeout(() => {
+      if (Date.now() >= relayCooldownUntil) {
+        stopRelayCountdown();
+        setRelayStatus('', true);
+      }
+    }, waitMs + 120);
+    return;
+  }
+  const next = (relayState===1)?0:1;
+  const ok = await doToggleWithRetries(next, MAX_RETRIES);
+  if (ok) {
+    relayState = next;
+    setRelayUI(relayState);
+    const cd = Math.max(TS_MIN_INTERVAL_MS, 5000);
+    relayCooldownUntil = now + cd;
+    setRelayStatus('Cambio aplicado. Espera para el siguiente…', true);
+    startRelayCountdown(cd);
+    setTimeout(() => { stopRelayCountdown(); setRelayStatus('', true); }, cd + 120);
+  }
+}
+
+window.addEventListener('load', ()=>{
+  const btn = document.getElementById('btnRelay'); if(btn){ btn.addEventListener('click', toggleRelay); }
+  readRelayState();
+  setInterval(readRelayState, 30000);
+});
+
+/* ===== Arranque ===== */
+startWorker();
+setWorkerInterval(15000);
+fetchRecentAndBackfill();
+startBackfillLoop();
+if(cfg.wakeWanted){ requestWakeLock(); }
+applyBackgroundPolicy();
+</script>
+</body>
+</html>
